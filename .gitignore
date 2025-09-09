@@ -2,4 +2,4 @@
 *.mod
 *.obj
 build/
-bin
+bin/
