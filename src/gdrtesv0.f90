@@ -1,4 +1,4 @@
-module Gdrtesv0
+module Mod_Gdrtes
 
   implicit none
 
@@ -143,7 +143,7 @@ subroutine Gdrtes(Nlyr, Nup, Ndn, Ngm, Nhm, AA, AAinv, UUinv, Odd, &
     enddo
     Z = matmul(transpose(PPm(1:Ngm,:))*spread(Glm(:,l),dim=1,ncopies=Nstr),Pmu0(1:Ngm)) !P0m
     Z = matmul(UUinv, Z) ! D0m
-    Z = matmul(Invmx(D), Z) * Ssad(l) / (4.0_Kreal2 * Pi)
+    Z = matmul(Invmx(D), Z) * Ssad(l) / (4.0_Kreal2 * Pi_d)
 
     Qt(:,l) = real(Z, Kreal) * Beam(l-1)
     Qb(:,l) = real(Z, Kreal) * Beam(l)
@@ -1860,4 +1860,4 @@ subroutine Rdcsym(XX, D1, E1, Novec)
 
 endsubroutine Rdcsym
 
-end module Gdrtesv0
+end module Mod_Gdrtes
