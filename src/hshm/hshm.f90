@@ -1,6 +1,6 @@
 module Hshmv4     ! v4.4.3
 
-  use Gdrtesv0, only: Kreal, Kreal2, Kint, Gdrtes, Identity, &
+  use Mod_Gdrtes, only: Kreal, Kreal2, Kint, Gdrtes, Identity, &
   & Invmx, Pi, Pi_d, Amirror
 
   implicit none
