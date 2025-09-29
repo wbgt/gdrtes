@@ -12,7 +12,9 @@ module Mod_Gdrtes
   integer, parameter:: Kreal2 = selected_real_kind (P = 13, R = 200) ! double
   integer, parameter:: Kint = selected_int_kind (9) ! integer
 
-  integer, parameter:: Kreal = Kreal1 ! or Kreal2 for double precision
+  ! switch between single and double precision of default real
+  integer, parameter:: Kreal = Kreal1 ! for single precision
+  !integer, parameter:: Kreal = Kreal2 ! for double precision
 
   real(Kreal2), parameter:: Pi_d = acos(-1.0_Kreal2)
   real(Kreal), parameter:: Pi = acos(-1.0_Kreal)
@@ -54,16 +56,16 @@ contains
 !-----------------------------------------------------------------------
 
 subroutine Gdrtes(Nlyr, Nup, Ndn, Ngm, Nhm, AA, AAinv, UUinv, Odd, &
-  & Ssad, Glm, PPm, Beam, Mu0, Pmu0, Thermal, ATint, B0, PPf, &
-  & Hm, Bsurf, Itild)
-  !use:
+& Ssad, Glm, PPm, Beam, Mu0, Pmu0, Thermal, ATint, B0, PPf, Hm, Bsurf, &
+& Itild)
   implicit none
 
   integer(Kint),intent(in):: Nlyr, Nup, Ndn, Ngm, Nhm
-  real(Kreal2),intent(in):: AA(Nup+Ndn,Nup+Ndn), AAinv(Nup+Ndn,Nup+Ndn), UUinv(Nup+Ndn,Nup+Ndn),&
-  & Glm(Ngm,Nlyr), PPm(max(Ngm,Nhm),Nup+Ndn), ATint(Nup+Ndn), PPf(Nhm,Ndn), Pmu0(max(Ngm,Nhm))
-  real(Kreal),intent(in):: Odd(Nlyr), Ssad(Nlyr), &
-  & Beam(0:Nlyr), Mu0, B0(0:Nlyr), Hm(Nhm,Nhm), Bsurf
+  real(Kreal2),intent(in):: AA(Nup+Ndn,Nup+Ndn), AAinv(Nup+Ndn,Nup+Ndn), &
+  & UUinv(Nup+Ndn,Nup+Ndn), Glm(Ngm,Nlyr), PPm(max(Ngm,Nhm),Nup+Ndn), &
+  & ATint(Nup+Ndn), PPf(Nhm,Ndn), Pmu0(max(Ngm,Nhm))
+  real(Kreal),intent(in):: Odd(Nlyr), Ssad(Nlyr), Beam(0:Nlyr), Mu0, &
+  & B0(0:Nlyr), Hm(Nhm,Nhm), Bsurf
   logical, intent(in):: Thermal
   real(Kreal),intent(out):: Itild(Nup+Ndn,0:Nlyr)
 
@@ -84,7 +86,7 @@ subroutine Gdrtes(Nlyr, Nup, Ndn, Ngm, Nhm, AA, AAinv, UUinv, Odd, &
 
 
   integer(Kint):: l, i, j
-  real(Kreal)::  Dump0 !, Dump1(Nlyr)
+  real(Kreal)::  Dump0
 
   Nd1 = Nup + 1
   Nstr = Nup + Ndn
@@ -94,54 +96,51 @@ subroutine Gdrtes(Nlyr, Nup, Ndn, Ngm, Nhm, AA, AAinv, UUinv, Odd, &
   ! Loop for layers
   do l = 1, Nlyr
     
-    App = matmul(transpose(PPm(1:Ngm,:)) * spread(Glm(:,l),dim=1,ncopies=Nstr), PPm(1:Ngm,:))
+    App = matmul(transpose(PPm(1:Ngm,:)) * &
+    & spread(Glm(:,l),dim=1,ncopies=Nstr), PPm(1:Ngm,:))
     App = AA - Ssad(l) * App
-    D(:,:) = matmul(UUinv, App)
+    D = matmul(UUinv, App)
 
     Amirror = .true.
-    if (Amirror) then
-      ! use Asymtx for hemisphere-confined and asymmetric base
+    if (Amirror) then  ! use Asymtx for asymmetric base
       call Deigendst(D, Dp, Dtred2, Nstr)
-      !print*, 'Dtred2a', Dtred2(1:Nstr)
-      !print*, Dp(1:Nstr,1:Nstr)
-    else
-      ! use Cholesky decomposition for general case
+    else  ! use Cholesky decomposition for general case
       call Deigen1d(App, UUinv, Dp, Dtred2)
-      !print*, 'Dtred2b', Dtred2(1:Nstr)
-      !print*, Dp(1:Nstr,1:Nstr)
     endif
-    !stop
     
     do j = 1, Nstr
+
       if (Dtred2(j).gt.0.0_Kreal2) then
         Dump0 = - Odd(l)
       else
         Dump0 = 0.0_Kreal2
       endif
+
       do i = 1, Nup
         Gout(i,j) = Dp(i,j) * exp(Dtred2(j) * Dump0)
         Gin(i,j) = Dp(i,j) * exp(Dtred2(j) * (Odd(l) + Dump0))
-
         Gt(i,j,l) = Gout(i,j)
         Gb(i,j,l) = Gin(i,j)
       enddo
+
       do i = Nd1, Nstr
         Gout(i,j) = Dp(i,j) * exp(Dtred2(j) * (Odd(l) + Dump0))
         Gin(i,j) = Dp(i,j) * exp(Dtred2(j) * Dump0)
-
         Gb(i,j,l) = Gout(i,j)
         Gt(i,j,l) = Gin(i,j)
       enddo
+
     enddo
 
     S(:,:,l) = real(matmul(Gout, Invmx(Gin)), Kreal)
-    D1(:,:) = Invmx(D(:,:))
+    D1 = Invmx(D)
 
     ! source from solar beam
     do i = 1, Nstr
       D(i,i) = D(i,i) + 1.0_Kreal2 / Mu0d
     enddo
-    Z = matmul(transpose(PPm(1:Ngm,:))*spread(Glm(:,l),dim=1,ncopies=Nstr),Pmu0(1:Ngm)) !P0m
+    Z = matmul(transpose(PPm(1:Ngm,:))*spread(Glm(:,l),dim=1,ncopies=Nstr), &
+    & Pmu0(1:Ngm)) !P0m
     Z = matmul(UUinv, Z) ! D0m
     Z = matmul(Invmx(D), Z) * Ssad(l) / (4.0_Kreal2 * Pi_d)
 
@@ -158,7 +157,7 @@ subroutine Gdrtes(Nlyr, Nup, Ndn, Ngm, Nhm, AA, AAinv, UUinv, Odd, &
     if (Thermal) then
       EE = matmul(UUinv, ATint)
       Yt = (1.0_Kreal - Ssad(l)) * real(matmul(D1,EE), Kreal) * &
-      &(B0(l) - B0(l-1))
+      & (B0(l) - B0(l-1))
       Y1 = Yt / Odd(l)
       Y0 = real(matmul(D1,(Y1+B0(l-1)*(1.0_Kreal-Ssad(l))*EE)), Kreal)
 
@@ -194,7 +193,6 @@ subroutine Gdrtes(Nlyr, Nup, Ndn, Ngm, Nhm, AA, AAinv, UUinv, Odd, &
   ! Bounary conditions can be solved with Adding or Band Diagonal System
   ! Option 1: Adding
   call Adding2(Nlyr, Nup, Ndn, S, Xpm, Itild)
-
   ! Option 2: Band Diagonal System
   ! call BandDiag(Nlyr, Nup, Ndn, Gt, Gb, Qt, Qb, Rs, Sigsup, Itild)
 
@@ -233,8 +231,8 @@ subroutine Adding2(Nlyr, Nup, Ndn, S, Xpm, Itild)
     Su(Nd1:Nstr,1:Nup,l) = S(Nd1:Nstr,1:Nup,l) + &
     & matmul(W1, matmul(Su(Nd1:Nstr,1:Nup,l-1), S(1:Nup,1:Nup,l)))
   
-    Xu(Nd1:Nstr,l) = Xpm(Nd1:Nstr,l) + matmul(W1, (matmul(Su(Nd1:Nstr,1:Nup,l-1), &
-    & Xpm(1:Nup,l)) + Xu(Nd1:Nstr,l-1)))
+    Xu(Nd1:Nstr,l) = Xpm(Nd1:Nstr,l) + matmul(W1, (matmul( &
+    & Su(Nd1:Nstr,1:Nup,l-1), Xpm(1:Nup,l)) + Xu(Nd1:Nstr,l-1)))
   
   enddo
 
@@ -246,13 +244,13 @@ subroutine Adding2(Nlyr, Nup, Ndn, S, Xpm, Itild)
     Xd(:,l) = 0.0_Kreal
   
     W2 = matmul(S(1:Nup,1:Nup,l+1), Invmx(Identity(Nup,1.0_Kreal) - &
-      matmul(Sd(1:Nup,Nd1:Nstr,l+1), S(Nd1:Nstr,1:Nup,l+1))))
+    & matmul(Sd(1:Nup,Nd1:Nstr,l+1), S(Nd1:Nstr,1:Nup,l+1))))
   
     Sd(1:Nup,Nd1:Nstr,l) = S(1:Nup,Nd1:Nstr,l+1) + &
-      matmul(W2, matmul(Sd(1:Nup,Nd1:Nstr,l+1), S(Nd1:Nstr,Nd1:Nstr,l+1)))
+    & matmul(W2, matmul(Sd(1:Nup,Nd1:Nstr,l+1), S(Nd1:Nstr,Nd1:Nstr,l+1)))
   
     Xd(1:Nup,l) = Xpm(1:Nup,l+1) + matmul(W2, (Xd(1:Nup,l+1) + &
-      matmul(Sd(1:Nup,Nd1:Nstr,l+1), Xpm(Nd1:Nstr,l+1))))
+    & matmul(Sd(1:Nup,Nd1:Nstr,l+1), Xpm(Nd1:Nstr,l+1))))
   
   enddo
 
@@ -273,109 +271,6 @@ subroutine Adding2(Nlyr, Nup, Ndn, S, Xpm, Itild)
 
 end subroutine Adding2
 
-!
-!subroutine Adding(Nlyr, Nup, Ndn, S, Xpm, Itild)
-!  !use : Invmx
-!  implicit none
-!  integer(Kint), intent(in):: Nlyr, Nup, Ndn
-!  real(Kreal), intent(in):: S(Nup+Ndn,Nup+Ndn,Nlyr+1), Xpm(Nup+Ndn,Nlyr+1)
-!  real(Kreal), intent(out):: Itild(Nup+Ndn,0:Nlyr)
-!
-!  real(Kreal):: Su(Nup+Ndn,Nup+Ndn,Nlyr+1), Sd(Nup+Ndn,Nup+Ndn,0:Nlyr)
-!  real(Kreal):: Xu(Nup+Ndn,Nlyr+1), Xd(Nup+Ndn,0:Nlyr)
-!  real(Kreal), dimension(Nup+Ndn):: Xustar
-!
-!  integer(Kint):: l, Nd1, Nstr
-!
-!  Nd1 = Nup + 1
-!  Nstr = Nup + Ndn
-!
-!  Su(:,:,1) = S(:,:,1)
-!  Xu(:,1) = Xpm(:,1)
-!  do l = 2, Nlyr
-!    call Addinga(Nup, Ndn, Su(:,:,l-1), Xu(:,l-1), &
-!    & S(:,:,l), Xpm(:,l), Su(:,:,l), &
-!    & Xu(:,l))
-!  enddo
-!  Sd(:,:,Nlyr) = S(:,:,Nlyr+1)
-!  Xd(:,Nlyr) = Xpm(:,Nlyr+1)
-!  do l = Nlyr-1, 0, -1
-!    call Addingb(Nup, Ndn, S(:,:,l+1), Xpm(:,l+1), &
-!    & Sd(:,:,l+1), Xd(:,l+1), Sd(:,:,l), &
-!    & Xd(:,l))
-!  enddo
-!
-!  ! Itild
-!  Itild(Nd1:Nstr,0) = 0.0_Kreal ! no downward diffuse at TOA
-!  Itild(1:Nup,0) = Xd(1:Nup,0) + matmul(Sd(1:Nup, &
-!  & Nd1:Nstr,0), Itild(Nd1:Nstr,0))
-!  do l = 1, Nlyr
-!    Xustar(1:Ndn) = Xu(Nd1:Nstr,l) + matmul( &
-!    & Su(Nd1:Nstr,Nd1:Nstr,l), Itild(Nd1:Nstr,0))
-!    Itild(1:Nup,l) = matmul(Invmx(Identity(Nup,1.0_Kreal) &
-!    & - matmul(Sd(1:Nup,Nd1:Nstr,l), Su(Nd1:Nstr, 1:Nup,l))), &
-!    & matmul(Sd(1:Nup,Nd1:Nstr,l), Xustar(1:Ndn)) + Xd(1:Nup,l))
-!    Itild(Nd1:Nstr,l) = matmul(Invmx(Identity(Ndn,1.0_Kreal) &
-!    & - matmul(Su(Nd1:Nstr,1:Nup,l), Sd(1:Nup,Nd1:Nstr,l))), &
-!    & matmul(Su(Nd1:Nstr,1:Nup,l), Xd(1:Nup,l)) + Xustar(1:Ndn))
-!  enddo
-!
-!end subroutine Adding
-!
-!subroutine Addinga(Nu0, Nd0, Sa, Xa, Sb, Xb, Sc, Xc)
-!  !use : Invmx, Identity
-!  implicit none
-!  integer(Kint), intent(in):: Nu0, Nd0
-!  real(Kreal), intent(in):: Sa(:,:), Xa(:), Sb(:,:), Xb(:)
-!  real(Kreal), intent(out):: Sc(:,:), Xc(:)
-!
-!  real(Kreal):: W1(Nd0,Nd0)
-!  integer(Kint):: N, Nd1
-!
-!  N = Nu0 + Nd0
-!  Nd1 = Nu0 + 1
-!
-!  Sc = 0.0_Kreal
-!  Xc = 0.0_Kreal
-!
-!  W1 = matmul(Sb(Nd1:N,Nd1:N), Invmx(Identity(Nd0,1._Kreal) - &
-!  & matmul(Sa(Nd1:N,1:Nu0), Sb(1:Nu0,Nd1:N))))
-!
-!  Sc(Nd1:N,1:Nu0) = Sb(Nd1:N,1:Nu0) + &
-!  & matmul(W1, matmul(Sa(Nd1:N,1:Nu0), Sb(1:Nu0,1:Nu0)))
-!
-!  Xc(Nd1:N) = Xb(Nd1:N) + matmul(W1, (matmul(Sa(Nd1:N,1:Nu0), &
-!  & Xb(1:Nu0)) + Xa(Nd1:N)))
-!
-!end subroutine Addinga
-!
-!subroutine Addingb(Nu0, Nd0, Sa, Xa, Sb, Xb, Sc, Xc)
-!  !use : Invmx, Identity
-!  implicit none
-!  integer(Kint), intent(in):: Nu0, Nd0
-!  real(Kreal), intent(in):: Sa(:,:), Xa(:), Sb(:,:), Xb(:)
-!  real(Kreal), intent(out):: Sc(:,:), Xc(:)
-!
-!  real(Kreal):: W2(Nu0,Nu0)
-!  integer(Kint):: N, Nd1
-!
-!  N = Nu0 + Nd0
-!  Nd1 = Nu0 + 1
-!
-!  Sc = 0.0_Kreal
-!  Xc = 0.0_Kreal
-!
-!  W2 = matmul(Sa(1:Nu0,1:Nu0), Invmx(Identity(Nu0,1._Kreal) - &
-!    matmul(Sb(1:Nu0,Nd1:N), Sa(Nd1:N,1:Nu0))))
-!
-!  Sc(1:Nu0,Nd1:N) = Sa(1:Nu0,Nd1:N) + &
-!    matmul(W2, matmul(Sb(1:Nu0,Nd1:N), Sa(Nd1:N,Nd1:N)))
-!
-!  Xc(1:Nu0) = Xa(1:Nu0) + matmul(W2, (Xb(1:Nu0) + &
-!    matmul(Sb(1:Nu0,Nd1:N), Xa(Nd1:N))))
-!
-!end subroutine Addingb
-
 !-----------------------------------------------------------------------
 ! Band Diagonal System
 subroutine BandDiag(Nlyr, Nup, Ndn, Gt, Gb, Qt, Qb, Rs, Sigsup, Itild)
@@ -385,8 +280,8 @@ subroutine BandDiag(Nlyr, Nup, Ndn, Gt, Gb, Qt, Qb, Rs, Sigsup, Itild)
   real(Kreal), intent(in):: Qt(Nup+Ndn,Nlyr), Qb(Nup+Ndn,Nlyr), Rs(Nup,Ndn), Sigsup(Nup)
   real(Kreal), intent(out):: Itild(Nup+Ndn,0:Nlyr)
 
-  real(Kreal):: A((Nup+Ndn)*Nlyr,(Nup+Ndn)*3-1), Al((Nup+Ndn)*Nlyr,Nup+Ndn+Ndn-1), &
-  & B((Nup+Ndn)*Nlyr), D
+  real(Kreal):: A((Nup+Ndn)*Nlyr,(Nup+Ndn)*3-1), &
+  & Al((Nup+Ndn)*Nlyr,Nup+Ndn+Ndn-1), B((Nup+Ndn)*Nlyr), D
   real(Kreal2):: Glp(Ndn,Nup+Ndn)
   integer(Kint):: M1, M2, Nstr, n, l, i, Indx((Nup+Ndn)*Nlyr)
 
@@ -420,14 +315,15 @@ subroutine BandDiag(Nlyr, Nup, Ndn, Gt, Gb, Qt, Qb, Rs, Sigsup, Itild)
   call Banbks(A, (Nup+Ndn)*Nlyr, M1, M2, Al, Indx, B)
 
   do l = 1, Nlyr
-    Itild(:,l-1) = matmul(real(Gt(:,:,l),Kreal), B((Nup+Ndn)*(l-1)+1:(Nup+Ndn)*(l))) + Qt(:,l)
+    Itild(:,l-1) = matmul(real(Gt(:,:,l),Kreal), &
+    & B((Nup+Ndn)*(l-1)+1:(Nup+Ndn)*(l))) + Qt(:,l)
   enddo
-  Itild(:,Nlyr) = matmul(real(Gb(:,:,Nlyr),Kreal), B((Nup+Ndn)*(Nlyr-1)+1:(Nup+Ndn)*(Nlyr))) + Qb(:,Nlyr)
+  Itild(:,Nlyr) = matmul(real(Gb(:,:,Nlyr),Kreal), &
+  & B((Nup+Ndn)*(Nlyr-1)+1:(Nup+Ndn)*(Nlyr))) + Qb(:,Nlyr)
 
 endsubroutine BandDiag
 
 SUBROUTINE Bandec(A, N, M1, M2, Al, Indx, D)
-  !USE nrtype; USE nrutil, ONLY : assert_eq,imaxloc,swap,arth
   implicit none
   real(Kreal), intent(inout):: A(N,M1+M2+1)
   real(Kreal), intent(out):: Al(N,M1)
@@ -440,16 +336,12 @@ SUBROUTINE Bandec(A, N, M1, M2, Al, Indx, D)
   integer(Kint):: i, k, l, Mdum, Mm, Imax(1)
   real(Kreal) :: Dum
 
-  !n=assert_eq(size(a,1),size(al,1),size(indx),'bandec: n')
-  !mm=assert_eq(size(a,2),m1+m2+1,'bandec: mm')
   Mm = M1 + M2 + 1
-  !mdum=assert_eq(size(al,2),m1,'bandec: mdum')
   Mdum = M1
   A(1:M1,:) = eoshift(A(1:M1,:), dim=2, shift=Arth_i(M1,-1,M1))
   D = 1.0_Kreal
   do k = 1, N
     l = min(M1+k, N)
-    !i = Imaxloc(abs(A(k:l,1))) + k - 1
     Imax = maxloc(abs(A(k:l,1)))
     i = Imax(1) + k - 1
     Dum = A(i,1)
@@ -496,7 +388,6 @@ function Arth_i(First, Increment, N)
 endfunction Arth_i
 
 subroutine Banbks(A, N, M1, M2, Al, Indx, B)
-  !USE nrtype; USE nrutil, ONLY : assert_eq,swap
   implicit none
   real(Kreal), intent(in):: A(N,M1+M2+1), Al(N,M1)
   integer(Kint), intent(in):: M1, M2, N
@@ -505,10 +396,7 @@ subroutine Banbks(A, N, M1, M2, Al, Indx, B)
   
   integer(Kint):: i, k, l, Mdum, Mm
 
-  !n=assert_eq(size(a,1),size(al,1),size(b),size(indx),'banbks: n')
-  !mm=assert_eq(size(a,2),m1+m2+1,'banbks: mm')
   MM = M1 + M2 + 1
-  !mdum=assert_eq(size(al,2),m1,'banbks: mdum')
   Mdum = M1
 
   do k = 1, N
@@ -523,14 +411,15 @@ subroutine Banbks(A, N, M1, M2, Al, Indx, B)
   enddo
 
 endsubroutine Banbks
-  
 
 !--------------------------------------------------------------------
 
-subroutine Surf(Nup, Ndn, Nhm, AAinv, PPh, PPf, Pmu0, Hm, Thermal, ATint, Beamsurf, Bs, Mu0, Rs, Sigsup)
+subroutine Surf(Nup, Ndn, Nhm, AAinv, PPh, PPf, Pmu0, Hm, Thermal, ATint, &
+& Beamsurf, Bs, Mu0, Rs, Sigsup)
 
   integer(Kint), intent(in):: Nup, Ndn, Nhm
-  real(Kreal2), intent(in):: AAinv(Nup+Ndn,Nup+Ndn), PPh(Nhm,Nup+Ndn), PPf(Nhm,Ndn), Pmu0(Nhm), ATint(Nup+Ndn)
+  real(Kreal2), intent(in):: AAinv(Nup+Ndn,Nup+Ndn), PPh(Nhm,Nup+Ndn), &
+  & PPf(Nhm,Ndn), Pmu0(Nhm), ATint(Nup+Ndn)
   real(Kreal), intent(in):: Hm(Nhm,Nhm), Beamsurf, Bs, Mu0
   logical, intent(in):: Thermal
   real(Kreal), intent(out):: Rs(Nup,Ndn), Sigsup(Nup)
@@ -557,22 +446,15 @@ subroutine Surf(Nup, Ndn, Nhm, AAinv, PPh, PPf, Pmu0, Hm, Thermal, ATint, Beamsu
   endif
 
   temp = matmul(AAinv(1:Nup,:), matmul(transpose(PPh), Hm))
-
   Rs = real(matmul(temp, PPf), Kreal) * 2 * Pi
-
   Ps0m = real(matmul(temp, Pmu0), Kreal)
 
   ! thermal source
   if (Thermal) then
-
     Rh = matmul(temp, PPf1) * 2 * Pi_d
-
     Epsm = real(matmul(AAinv(1:Nup,:), ATint) - Rh, Kreal)
-
   else
-
     Epsm = 0.0_Kreal
-
   endif
 
   Sigsup = Beamsurf * Mu0 * Ps0m + Epsm * Bs
@@ -591,7 +473,7 @@ subroutine Abba_i(A,B)
   A = B
   B = Tmp
 endsubroutine Abba_i
-!BL
+
 subroutine Abba_r(A,B)
   real(Kreal1), intent(inout):: A,B
   real(Kreal1):: Tmp
@@ -599,7 +481,7 @@ subroutine Abba_r(A,B)
   A = B
   B = Tmp
 endsubroutine Abba_r
-!BL
+
 subroutine Abba_d(A,B)
   real(Kreal2), intent(inout):: A,B
   real(Kreal2):: Tmp
@@ -607,7 +489,7 @@ subroutine Abba_d(A,B)
   A = B
   B = Tmp
 endsubroutine Abba_d
-!BL
+
 subroutine Abba_rv(A,B)
   real(Kreal1), dimension(:), intent(inout):: A,B
   real(Kreal1), dimension(SIZE(A)):: Tmp
@@ -615,7 +497,7 @@ subroutine Abba_rv(A,B)
   A = B
   B = Tmp
 endsubroutine Abba_rv
-!BL
+
 subroutine Abba_dv(A,B)
   real(Kreal2), dimension(:), intent(inout):: A,B
   real(Kreal2), dimension(SIZE(A)):: Tmp
@@ -650,7 +532,7 @@ SUBROUTINE Asymtx( AA, EVEC, EVAL, M, IA, IEVEC, IER)
 !       EVECD :  double precision stand-in for EVEC
 !       EVALD :  double precision stand-in for EVAL
 !
-  !   Calls- D1MACH, ERRMSG
+!   Calls- D1MACH, ERRMSG
 ! +-------------------------------------------------------------------+
   implicit none
 
@@ -1424,7 +1306,7 @@ subroutine Cskdcp(XX, P)
     endif
     P(i) = sqrt(Summ)
     XX(i+1:N,i) = (XX(i,i+1:N) - matmul(XX(i+1:N,1:i-1),XX(i,1:i-1))) &
-      / P(i)
+    & / P(i)
   enddo
 endsubroutine Cskdcp
 
@@ -1436,8 +1318,8 @@ subroutine Deigen1d(App, Uinv, Dp, D)
   real(Kreal2), intent(out):: Dp(:,:), D(:)
 
   real(Kreal2):: X(size(App,1),size(App,2)), Xdiag(size(App,1)), &
-                E(size(App,1)), Dump(size(App,1),size(App,1)), &
-                Dp_d(size(App,1),size(App,1)), Dq(size(App,1))
+                 & E(size(App,1)), Dump(size(App,1),size(App,1)), &
+                 & Dp_d(size(App,1),size(App,1)), Dq(size(App,1))
   integer(Kint):: i, j, Nstr
   
   Nstr=size(App,1)
@@ -1453,7 +1335,7 @@ subroutine Deigen1d(App, Uinv, Dp, D)
   enddo
 
   Dp_d(1:Nstr,1:Nstr) = matmul(transpose(X(1:Nstr,1:Nstr)), &
-    Uinv(1:Nstr,1:Nstr))
+  & Uinv(1:Nstr,1:Nstr))
   Dp_d(1:Nstr,1:Nstr) = matmul(Dp_d(1:Nstr,1:Nstr), X(1:Nstr,1:Nstr))
 
   call Rdcsym(Dp_d(1:Nstr,1:Nstr), Dq(1:Nstr), E(1:Nstr))
@@ -1461,7 +1343,7 @@ subroutine Deigen1d(App, Uinv, Dp, D)
 
   Dump(1:Nstr,1:Nstr) = transpose(X(1:Nstr,1:Nstr))
   Dp(1:Nstr,1:Nstr) = matmul(Invmx(Dump(1:Nstr,1:Nstr)), &
-  Dp_d(1:Nstr,1:Nstr))
+  & Dp_d(1:Nstr,1:Nstr))
   D = Dq
 
 endsubroutine Deigen1d
@@ -1492,12 +1374,13 @@ subroutine Deigendst(D, Dp, Dtred2, Nstr)
   endif
 
   Dtred2(1:Nstr:2) = sqrt(abs(Eval))
-  !Dtred2(Nup:1:-1) = - Dtred2(Nup+1:Nstr)
   Dtred2(2:Nstr:2) = - Dtred2(1:Nstr:2)
 
-  Evecm(1:Nup,1:Nup) = matmul(Alpha + Beta, Evecp(1:Nup,1:Nup)) / spread(Dtred2(1:Nstr:2), 1, Nup)
+  Evecm(1:Nup,1:Nup) = matmul(Alpha + Beta, Evecp(1:Nup,1:Nup)) / &
+  & spread(Dtred2(1:Nstr:2), 1, Nup)
   Dp(1:Nup,1:Nstr:2) = (Evecp(1:Nup,1:Nup) + Evecm(1:Nup,1:Nup)) * 0.5_Kreal2
-  Dp((Nup+1):Nstr,1:Nstr:2) = (Evecp(1:Nup,1:Nup) - Evecm(1:Nup,1:Nup)) * 0.5_Kreal2
+  Dp((Nup+1):Nstr,1:Nstr:2) = (Evecp(1:Nup,1:Nup) - Evecm(1:Nup,1:Nup)) * &
+  & 0.5_Kreal2
   Dp(1:Nup,2:Nstr:2) = Dp((Nup+1):Nstr,1:Nstr:2)
   Dp((Nup+1):Nstr,2:Nstr:2) = Dp(1:Nup,1:Nstr:2)
 
@@ -1568,7 +1451,6 @@ subroutine Evtrisym(D1, E1, ZZ)
 
 endsubroutine Evtrisym
 
-
 !-------------------------------------------------------------------- - 
 ! Fbsub
 
@@ -1597,6 +1479,7 @@ subroutine Fbsub_r(X, Ind, Y)
   do i = N, 1, -1
     Y(i) = (Y(i) - dot_product(X(i,i+1:N),Y(i+1:N))) / X(i,i)
   enddo
+
 endsubroutine Fbsub_r
 
 subroutine Fbsub_d(X,Ind,Y)
@@ -1624,6 +1507,7 @@ subroutine Fbsub_d(X,Ind,Y)
   do i = N, 1, -1
     Y(i) = (Y(i) - dot_product(X(i,i+1:N),Y(i+1:N))) / X(i,i)
   enddo
+
 endsubroutine Fbsub_d
 
 !--------------------------------------------------------------------
@@ -1752,6 +1636,7 @@ subroutine Ludcp_r(X, Ind, D0)
     X(j+1:N,j+1:N) = X(j+1:N,j+1:N) - spread(X(j+1:N,j),dim=2,  &
       ncopies=N-j) * spread(X(j,j+1:N),dim=1,ncopies=N-j)
   enddo
+
 endsubroutine Ludcp_r
 
 subroutine Ludcp_d(X, Ind, D0)
@@ -1785,6 +1670,7 @@ subroutine Ludcp_d(X, Ind, D0)
     X(j+1:N,j+1:N) = X(j+1:N,j+1:N) - spread(X(j+1:N,j),dim=2,  &   
       ncopies=N-j) * spread(X(j,j+1:N),dim=1,ncopies=N-j)
   enddo
+  
 endsubroutine Ludcp_d
 
 !--------------------------------------------------------------------
