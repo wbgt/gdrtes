@@ -1,15 +1,15 @@
 program  testHSHM
 
     use Mod_Gdrtes, only: Kreal, Kint, Pi
-    use Mod_Hshm, only: Hshm, Hshminit, Hshminit1, Nm, Ng, Nh, Lup, Ldn, Lmup, Lmdn, &
-    & Numu, Nphi, Umu, Phi, &
-    & Hshmfin, Itild ! Maxm, Maxg, Maxl
+    use Mod_Hshm, only: Hshm, Hshminit, Hshminit1, &
+    & Nm, Ng, Nh, Lup, Ldn, Lmup, Lmdn, Numu, Nphi, Umu, Phi, &
+    & Hshmfin, Itild
     implicit none
 
     integer(Kint), parameter:: Nlyr=2, Mphi=180, Mumu=180, Maxg=2000
     real(Kreal):: Od(1:Nlyr), Ssa(1:Nlyr), Pf(0:Maxg,1:Nlyr), Mu0, &
       I0, Gs(0:Maxg), Phir(Mphi), &
-      Beam(0:Nlyr), Radh(Mumu,Mphi,0:Nlyr) !Itild(2*Maxl,0:Nlyr,0:Maxm)
+      Beam(0:Nlyr), Radh(Mumu,Mphi,0:Nlyr)
 
     real(Kreal):: Fup(0:Nlyr), Fdn(0:Nlyr), Act(0:Nlyr)
     integer(Kint):: l, lay, i, m, Ifile=10, Mm, Mg, Kp, Nlay
@@ -21,7 +21,7 @@ program  testHSHM
     real(Kreal):: Asf(Nlyr), Cputm1, Cputm2, Cpu, Crt=0.0_Kreal
 
     namelist /Runcase/ Lup, Ldn, Nm, Ng, I0, Mu0, Od, Kp, Asf, Ssa, &
-                      Nh, Rsurf, Deltam0
+    &                  Nh, Rsurf, Deltam0
 
     First = .true.
     Deltam0 = .false.
@@ -41,15 +41,6 @@ program  testHSHM
     Wnumhi = 900.
     T = 273.0
     Tsurf = 273.0
-!    if (Planck) then
-!      do l = 0, Nlyr
-!        B0(l) = Planckint(Wnumlo, Wnumhi, Tmp(l))
-!      enddo
-!      Bsurf = Planckint(Wnumlo, Wnumhi, Tsurf)
-!    else
-!      B0(0:Nlyr) = 0.0
-!      Bsurf = 0.0
-!    endif
 
     ! Read input control
     open(Ifile, file='Input.txt')
@@ -74,7 +65,6 @@ program  testHSHM
 
     print*, 'Running for Od, Mu0 = ', Od(1:Nlyr), Mu0
 
-    !open(Ifile, file='exampleout.txt')
     open(Ifile, file='Ireal.txt')
         
     write(Ifile,*) '# I0'
@@ -118,21 +108,13 @@ program  testHSHM
     call cpu_time(Cputm2)
     print*, 'Done. After ', Cputm2-Cputm1, 'seconds.'
 
-    !print*, 'Run for Mm = ', Mm
-
-
     write(Ifile,*) 'For HSHMv4:'
-
-    !call HSHM
-    !call Hshminit(First)
 
     print*, 'Running HSHM with Nm = ', Nm
     
     call cpu_time(Cputm1)  
-    call Hshm(Nlay, Od, Ssa, Pf(0:Mg,1:Nlyr), I0, Mu0, &
-    & T, Tsurf, Gs(0:Nh-1), &
+    call Hshm(Nlay, Od, Ssa, Pf(0:Mg,1:Nlyr), I0, Mu0, T, Tsurf, Gs(0:Nh-1), &
     & Planck, Deltam0, Wnumlo, Wnumhi, Beam, Radh, Fup, Fdn, Act, Crt, Cpu)
-    ! removed Itild(1:Maxl*2,0:Nlyr,0:Mm), in the list
     call cpu_time(Cputm2)
     print*, 'HSHM cputime = ', Cputm2 - Cputm1
     write(Ifile,*) 'HSHM cputime = ', Cputm2 - Cputm1
@@ -184,7 +166,6 @@ program  testHSHM
     !     4: Aerosol as specified by Kokhanovsky, adopted from DISORT, Mg:0~931
     !     5: Cloud as specified by Kokhanovsky, adopted from DISORT, Mg:0~1999
   
-    !use Gdrtesv0, only: Kint, Kreal
     implicit none
     integer(Kint), intent(in):: Kp, Mg
     real(Kreal), intent(in):: Asf
