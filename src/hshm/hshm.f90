@@ -1,4 +1,4 @@
-module Hshmv4     ! v4.4.3
+module Mod_Hshm
 
   use Mod_Gdrtes, only: Kreal, Kreal2, Kint, Gdrtes, Identity, &
   & Invmx, Pi, Pi_d, Amirror
@@ -8,7 +8,7 @@ module Hshmv4     ! v4.4.3
   private
 
   public:: Nm, Ng, Nh, Lup, Ldn, Numu, Nphi, Umu, Phi, & ! input
-  & Hshminit, Hshminit1, Hshmfin, Hshm, Planckint, & !Maxm, Maxg, Maxl, &
+  & Hshminit, Hshminit1, Hshmfin, Hshm, Planckint, &
   & Lmup, Lmdn, Itild ! Lmup, Lmdn only for diagnostic purpose, can be removed.
 
   ! Nm: user-specified number of azimuth expansion (m=0~Nm-1=Mm<=Maxm)
@@ -18,28 +18,19 @@ module Hshmv4     ! v4.4.3
   !     <0,   parallelogram truncation; number of terms, -Lup(dn)
   ! Ng: user-specified number of phase function terms (Ng-1<=Maxg)
   ! Nh: user-specified number terms of BDRF of surface (<=Mm assumed)
-  integer(Kint):: Nm=64, Lup=0, Ldn=0, Ng=64, Nh=1, Numu, Nphi !default values can be changed
-
-  ! Maxm: maximum order of azimuth expansion
-  ! Maxl: maximum number of zenith expansion in a hemisphere
-  ! Maxg: maxiumu order of phase function
-  !integer(Kint), parameter:: Maxm=420, Maxl=Maxm/2, Maxg=Maxm, &  ! Maxm up to 320
-  !& Maxlg=max(Maxl*2,Maxg)
+  !
+  ! Default values, can be changed
+  integer(Kint):: Nm=64, Lup=0, Ldn=0, Ng=64, Nh=1, Numu, Nphi
 
   integer(Kint):: Mm, Mg, Ml
   integer(Kint), allocatable:: Lmup(:), Lmdn(:)
 
-  !real(Kreal2):: Clm(0:Maxlg,0:Maxm), Pllm(0:Maxlg+1,0:Maxlg+1,0:Maxm), &
-  !& Ullm(0:Maxl*2+Maxm,0:Maxl*2+Maxm,0:Maxm)
   real(Kreal2), allocatable:: Clmh(:,:), Pllm(:,:,:), Ullm(:,:,:), Ullmh(:,:,:)
   real(Kreal), allocatable:: Umu(:), Phi(:)
 
-  !real(Kreal2):: &
-  !& AA(Maxl*2,Maxl*2,0:Maxm), AAinv(Maxl*2,Maxl*2,0:Maxm), ATint(Maxl*2), &
-  !& UUinv(Maxl*2,Maxl*2,0:Maxm), PP(Maxlg+1,Maxl*2,0:Maxm)
   real(Kreal2), allocatable:: AA(:,:), ATint(:), UUinv(:,:,:), PP(:,:,:)
   real(Kreal2), allocatable:: Legr(:,:,:), Cosphi(:,:)
-  real(Kreal), allocatable:: Itild(:,:,:) !(Maxl*2,0:Nlyr,0:Mm)
+  real(Kreal), allocatable:: Itild(:,:,:)
 
   contains
 
@@ -53,8 +44,6 @@ subroutine Hshminit(First)
   logical, intent(in):: First
 
   integer(Kint):: i, j, l, m, Ntmp, Nup, Ndn, Nd1, Nstr, Mlg, Lmm
-  !real(Kreal2), allocatable:: X1(Maxlg+Maxm), W1(Maxlg+Maxm), &
-  !& P2(Maxlg+Maxm,0:Maxlg+Maxm), UU(Maxl*2,Maxl*2,0:Maxm)
   real(Kreal2), allocatable:: Clm(:,:)
   real(Kreal2), allocatable:: X1(:), W1(:), P2(:,:)
   real(Kreal2):: Temp1, Temp2
@@ -64,31 +53,16 @@ subroutine Hshminit(First)
   Mm = Nm - 1
   Mg = Ng - 1
   
-  ! To be replaced with a subroutine.
-  !if (Mm > Maxm) then
-  !  print*, 'Error in Hshminit: Mm > Maxm, ', Mm, Maxm
-  !  stop
-  !endif
-  
-  !if (Mg < Mm) then
-  !  print*, 'Error in Hshint: Mg < Mm, ', Mg, Mm
-  !  stop
-  !endif
-  
- !Lm(0:Maxm) = length of A^{pm} ! not maximum l for each m
-
   if (First) then
     allocate(Lmup(0:Mm), Lmdn(0:Mm))
   endif
 
   if (Lup.ge.0) then
-    !Lmup(0:Mm) = (Nm + Lup - (/(i,i=0,Mm)/) + 1) /2
     Lmup(0:Mm) = (Nm - (/(i,i=0,Mm)/) + 1) /2  + Lup
   else
     Lmup(0:Mm) = - Lup
   endif
   if (Ldn.ge.0) then
-    !Lmdn(0:Mm) = (Nm + Ldn - (/(i,i=0,Mm)/) + 1) /2
     Lmdn(0:Mm) = (Nm - (/(i,i=0,Mm)/) + 1) /2 + Ldn
   else
     Lmdn(0:Mm) = - Ldn
@@ -99,7 +73,6 @@ subroutine Hshminit(First)
   else
     Amirror = .false.
   endif
-  !Amirror = .false.
 
   Mlg = max(2*Lmup(0)-2, 2*Lmdn(0)-2, Mg, Nh-1)
   Ml = max(Lmup(0), Lmdn(0))
@@ -170,7 +143,7 @@ subroutine Hshminit(First)
         Ullm(0,i-m,m) = 0.0_Kreal2
         Ullm(i-m,0,m) = Ullm(0,i-m,m)
       enddo
-    ! when l > m
+      ! when l > m
       do l = m+1, Mlg
         ! when l' = l + 1
         Temp1 = sqrt((l-m+1.0_Kreal2)*(l+m+1)/((2*l+1)*(2*l+3)))
@@ -194,7 +167,6 @@ subroutine Hshminit(First)
     ! AA, AAinv
     allocate(AA(Ml*2,Ml*2))
     AA(1:Ml*2,1:Ml*2) = Identity(Ml*2, 1.0_Kreal2)
-    !AAinv(1:Nstr,1:Nstr,m) = AA(1:Nstr,1:Nstr,m)
 
     Nm0 = Nm
     Ng0 = Ng
@@ -269,8 +241,6 @@ subroutine Hshminit1()
   ! A light versition of Hshminit, trying to save memory, it runs only once.
 
   integer(Kint):: i, j, l, m, Ntmp, Nup, Ndn, Nd1, Nstr, Mlg, Lmm
-  !real(Kreal2), allocatable:: X1(Maxlg+Maxm), W1(Maxlg+Maxm), &
-  !& P2(Maxlg+Maxm,0:Maxlg+Maxm), UU(Maxl*2,Maxl*2,0:Maxm)
   real(Kreal2), allocatable:: Clm(:,:)
   real(Kreal2), allocatable:: X1(:), W1(:), P2(:,:)
   real(Kreal2):: Temp1, Temp2
@@ -280,19 +250,6 @@ subroutine Hshminit1()
   Mm = Nm - 1
   Mg = Ng - 1
   
-  ! To be replaced with a subroutine.
-  !if (Mm > Maxm) then
-  !  print*, 'Error in Hshminit: Mm > Maxm, ', Mm, Maxm
-  !  stop
-  !endif
-  
-  !if (Mg < Mm) then
-  !  print*, 'Error in Hshint: Mg < Mm, ', Mg, Mm
-  !  stop
-  !endif
-  
- !Lm(0:Maxm) = length of A^{pm} ! not maximum l for each m
-
   allocate(Lmup(0:Mm), Lmdn(0:Mm))
 
   if (Lup.ge.0) then
@@ -311,120 +268,103 @@ subroutine Hshminit1()
   else
     Amirror = .false.
   endif
-  !Amirror = .false.
 
   Mlg = max(2*Lmup(0)-2, 2*Lmdn(0)-2, Mg, Nh-1)
   Ml = max(Lmup(0), Lmdn(0))
 
-  ! UUinv, PP, ATint
-  !if (allocated(ATint)) then
-  !  deallocate(ATint, UUinv, PP)
-  !endif
   allocate(ATint(Ml*2), UUinv(Ml*2,Ml*2,0:Mm), PP(Mlg+1,Ml*2,0:Mm))
 
-  !if (First) then
-
-    ! global allocated arrays
-    allocate(Clm(0:Mlg+1,0:Mm), Pllm(0:Mlg+1,0:Mlg+1,0:Mm), &
-    & Ullm(0:Ml*2+Mm,0:Ml*2+Mm,0:Mm))
-    allocate(Clmh(0:Nh,0:Nh), Ullmh(0:Nh,0:Ml*2+Mm,0:Nh))
-
-    ! local allocated arrays
-    allocate(X1(Mlg+Mm+1), W1(Mlg+Mm+1), P2(Mlg+Mm+1,0:Mlg+Mm+1))
-
-    Clm(0,0) = sqrt(2.0_Kreal2)
-    do l = 1, Mlg+1
-      Clm(l,0) = sqrt((2*l+1.0_Kreal2) / (2*l-1)) * Clm(l-1,0)
+  ! global allocated arrays
+  allocate(Clm(0:Mlg+1,0:Mm), Pllm(0:Mlg+1,0:Mlg+1,0:Mm), &
+  & Ullm(0:Ml*2+Mm,0:Ml*2+Mm,0:Mm))
+  allocate(Clmh(0:Nh,0:Nh), Ullmh(0:Nh,0:Ml*2+Mm,0:Nh))
+  ! local allocated arrays
+  allocate(X1(Mlg+Mm+1), W1(Mlg+Mm+1), P2(Mlg+Mm+1,0:Mlg+Mm+1))
+  Clm(0,0) = sqrt(2.0_Kreal2)
+  do l = 1, Mlg+1
+    Clm(l,0) = sqrt((2*l+1.0_Kreal2) / (2*l-1)) * Clm(l-1,0)
+  enddo
+  do m = 1, Mm
+    Mlg = max(2*Lmup(m)+m-2, 2*Lmdn(m)+m-2, Mg, Nh-1)
+    Clm(0,m) = sqrt((2*m+1.0_Kreal2)/(2*m)) / (2*m-1) * &
+    & Clm(0,m-1)
+    do l = m+1, Mlg+1
+      Clm(l-m,m) = sqrt((2*l+1.0_Kreal2)/(2*l-1)*(l-m)/(l+m)) &
+      &  * Clm(l-1-m,m)
     enddo
-
-    do m = 1, Mm
-      Mlg = max(2*Lmup(m)+m-2, 2*Lmdn(m)+m-2, Mg, Nh-1)
-      Clm(0,m) = sqrt((2*m+1.0_Kreal2)/(2*m)) / (2*m-1) * &
-      & Clm(0,m-1)
-      do l = m+1, Mlg+1
-        Clm(l-m,m) = sqrt((2*l+1.0_Kreal2)/(2*l-1)*(l-m)/(l+m)) &
-        &  * Clm(l-1-m,m)
-      enddo
-    enddo
-    clmh(0:Nh,0:Nh) = Clm(0:Nh,0:Nh)
-    
-    do m = 0, Mm
-      Mlg = max(2*Lmup(m)+m-2, 2*Lmdn(m)+m-2, Mg, Nh-1)
-      Ntmp = Mlg + 1
-      call Glquad(0.0_Kreal2, 1.0_Kreal2, X1(1:Ntmp), W1(1:Ntmp))
-      P2(1:Ntmp,m:Mlg+1) = Phat(Mlg+1,m,X1(1:Ntmp))
-      do l = m, Mlg+1
-        Pllm(l-m,l-m,m) = 1.0_Kreal2
-        do i = l+2, Mlg+1, 2
-          Pllm(l-m,i-m,m) = 0.0_Kreal2
-          Pllm(i-m,l-m,m) = 0.0_Kreal2
-        enddo
-        do i = l+1, Mlg+1, 2
-          Pllm(l-m,i-m,m) = sum(P2(1:Ntmp,l) &
-          & * W1(1:Ntmp) * P2(1:Ntmp,i)) * 0.5_Kreal2
-          Pllm(i-m,l-m,m) = Pllm(l-m,i-m,m)
-        enddo
-      enddo
-    enddo
+  enddo
+  clmh(0:Nh,0:Nh) = Clm(0:Nh,0:Nh)
   
-    do m = 0, Mm
-      ! when l = m
-      Temp1 = sqrt((m+m+1.0_Kreal2)/((2*m+1)*(2*m+3)))
-      Mlg = max(2*Lmup(m)+m-2, 2*Lmdn(m)+m-2, Nh-1)
-      do i = m, Mlg, 2
-        Ullm(0,i-m,m) = Pllm(1,i-m,m) * Temp1
-        Ullm(i-m,0,m) = Ullm(0,i-m,m)
+  do m = 0, Mm
+    Mlg = max(2*Lmup(m)+m-2, 2*Lmdn(m)+m-2, Mg, Nh-1)
+    Ntmp = Mlg + 1
+    call Glquad(0.0_Kreal2, 1.0_Kreal2, X1(1:Ntmp), W1(1:Ntmp))
+    P2(1:Ntmp,m:Mlg+1) = Phat(Mlg+1,m,X1(1:Ntmp))
+    do l = m, Mlg+1
+      Pllm(l-m,l-m,m) = 1.0_Kreal2
+      do i = l+2, Mlg+1, 2
+        Pllm(l-m,i-m,m) = 0.0_Kreal2
+        Pllm(i-m,l-m,m) = 0.0_Kreal2
       enddo
-      i = m + 1
+      do i = l+1, Mlg+1, 2
+        Pllm(l-m,i-m,m) = sum(P2(1:Ntmp,l) &
+        & * W1(1:Ntmp) * P2(1:Ntmp,i)) * 0.5_Kreal2
+        Pllm(i-m,l-m,m) = Pllm(l-m,i-m,m)
+      enddo
+    enddo
+  enddo
+
+  do m = 0, Mm
+    ! when l = m
+    Temp1 = sqrt((m+m+1.0_Kreal2)/((2*m+1)*(2*m+3)))
+    Mlg = max(2*Lmup(m)+m-2, 2*Lmdn(m)+m-2, Nh-1)
+    do i = m, Mlg, 2
       Ullm(0,i-m,m) = Pllm(1,i-m,m) * Temp1
       Ullm(i-m,0,m) = Ullm(0,i-m,m)
-      do i = m+3, Mlg, 2
-        Ullm(0,i-m,m) = 0.0_Kreal2
-        Ullm(i-m,0,m) = Ullm(0,i-m,m)
+    enddo
+    i = m + 1
+    Ullm(0,i-m,m) = Pllm(1,i-m,m) * Temp1
+    Ullm(i-m,0,m) = Ullm(0,i-m,m)
+    do i = m+3, Mlg, 2
+      Ullm(0,i-m,m) = 0.0_Kreal2
+      Ullm(i-m,0,m) = Ullm(0,i-m,m)
+    enddo
+  ! when l > m
+    do l = m+1, Mlg
+      ! when l' = l + 1
+      Temp1 = sqrt((l-m+1.0_Kreal2)*(l+m+1)/((2*l+1)*(2*l+3)))
+      Temp2 = sqrt(real((l-m)*(l+m),Kreal2) / ((2*l-1)*(2*l+1)))
+      Ullm(l-m,l+1-m,m) = Pllm(l+1-m,l+1-m,m) * Temp1
+      Ullm(l+1-m,l-m,m) = Ullm(l-m,l+1-m,m)
+      ! when l-l' is even
+      do i = l, Mlg, 2
+        Ullm(l-m,i-m,m) = Pllm(l+1-m,i-m,m)*Temp1 + Pllm(l-1-m,i-m,m)*Temp2
+        Ullm(i-m,l-m,m) = Ullm(l-m,i-m,m)
       enddo
-    ! when l > m
-      do l = m+1, Mlg
-        ! when l' = l + 1
-        Temp1 = sqrt((l-m+1.0_Kreal2)*(l+m+1)/((2*l+1)*(2*l+3)))
-        Temp2 = sqrt(real((l-m)*(l+m),Kreal2) / ((2*l-1)*(2*l+1)))
-        Ullm(l-m,l+1-m,m) = Pllm(l+1-m,l+1-m,m) * Temp1
-        Ullm(l+1-m,l-m,m) = Ullm(l-m,l+1-m,m)
-        ! when l-l' is even
-        do i = l, Mlg, 2
-          Ullm(l-m,i-m,m) = Pllm(l+1-m,i-m,m)*Temp1 + Pllm(l-1-m,i-m,m)*Temp2
-          Ullm(i-m,l-m,m) = Ullm(l-m,i-m,m)
-        enddo
-        ! when l-l' is old
-        do i = l+3, Mlg, 2
-          Ullm(l-m,i-m,m) = 0.0_Kreal2
-          Ullm(i-m,l-m,m) = Ullm(l-m,i-m,m)
-        enddo
+      ! when l-l' is old
+      do i = l+3, Mlg, 2
+        Ullm(l-m,i-m,m) = 0.0_Kreal2
+        Ullm(i-m,l-m,m) = Ullm(l-m,i-m,m)
       enddo
     enddo
-    Ullmh(0:Nh,0:Ml*2+Mm,0:Nh) = Ullm(0:Nh,0:Ml*2+Mm,0:Nh)
+  enddo
+  Ullmh(0:Nh,0:Ml*2+Mm,0:Nh) = Ullm(0:Nh,0:Ml*2+Mm,0:Nh)
+  ! AA, AAinv
+  allocate(AA(Ml*2,Ml*2))
+  AA(1:Ml*2,1:Ml*2) = Identity(Ml*2, 1.0_Kreal2)
 
-    ! AA, AAinv
-    allocate(AA(Ml*2,Ml*2))
-    AA(1:Ml*2,1:Ml*2) = Identity(Ml*2, 1.0_Kreal2)
-    !AAinv(1:Nstr,1:Nstr,m) = AA(1:Nstr,1:Nstr,m)
-
-    Nm0 = Nm
-    Ng0 = Ng
-    Lup0 = Lup
-    Ldn0 = Ldn
-
-    deallocate(X1, W1, P2, Clm)
-
-    allocate(Legr(Numu,0:Ml*2+Mm,0:Mm), Cosphi(Nphi,0:Mm))
-
-    do m = 0, Mm
-      Cosphi(:,m) = cos(m*Phi(:))
-      Lmm = max(Lmup(m), Lmdn(m))
-      l = m + 2*Lmm - 1
-      Legr(:,m:l,m) = Phat(l,m,real(abs(Umu(1:Numu)), Kreal2))
-    enddo
-
-  !endif
+  Nm0 = Nm
+  Ng0 = Ng
+  Lup0 = Lup
+  Ldn0 = Ldn
+  deallocate(X1, W1, P2, Clm)
+  allocate(Legr(Numu,0:Ml*2+Mm,0:Mm), Cosphi(Nphi,0:Mm))
+  do m = 0, Mm
+    Cosphi(:,m) = cos(m*Phi(:))
+    Lmm = max(Lmup(m), Lmdn(m))
+    l = m + 2*Lmm - 1
+    Legr(:,m:l,m) = Phat(l,m,real(abs(Umu(1:Numu)), Kreal2))
+  enddo
 
   do m = 0, Mm
   
@@ -477,16 +417,16 @@ subroutine Hshm(Nlyr, Od0, Ssa0, Pf, I0, Mu0, T, Tsurf, GS, &
   & Thermal, Deltam, Wnumlo, Wnumhi, &
   Beam, Rad, Fup, Fdn, Act, Crt, Cpu)
 
-  integer(Kint), intent(in):: Nlyr!, Numu, Nphi
+  integer(Kint), intent(in):: Nlyr
   real(Kreal), intent(in):: Od0(Nlyr), Ssa0(Nlyr), Pf(0:Mg,Nlyr), I0, Mu0, &
   & T(0:Nlyr), Gs(0:Nh-1), Tsurf, Wnumlo, Wnumhi, Crt
   logical, intent(in):: Deltam, Thermal
-  real(Kreal), intent(out):: Beam(0:Nlyr), & !Itild(Maxl*2,0:Nlyr,0:Mm), &
-  & Rad(Numu,Nphi,0:Nlyr), Fup(0:Nlyr), Fdn(0:Nlyr), Act(0:Nlyr), Cpu
+  real(Kreal), intent(out):: Beam(0:Nlyr), Rad(Numu,Nphi,0:Nlyr), &
+  & Fup(0:Nlyr), Fdn(0:Nlyr), Act(0:Nlyr), Cpu
 
   integer(Kint):: Ngd, Ngm, i, j, l, m, Nup, Ndn, Nstr, Nhm, Nghm
-  real(Kreal):: Od(Nlyr), Ssa(Nlyr), Ssad(Nlyr), &
-  & Pfd(0:Mg,Nlyr), Odd(Nlyr), Dump1(Nlyr), B0(0:Nlyr), Hm(Nh,Nh), Bsurf
+  real(Kreal):: Od(Nlyr), Ssa(Nlyr), Ssad(Nlyr), Pfd(0:Mg,Nlyr), Odd(Nlyr), &
+  & Dump1(Nlyr), B0(0:Nlyr), Hm(Nh,Nh), Bsurf
   real(Kreal2):: Glm(0:Mg,Nlyr), PPfm(Nh,Ml), Pmu0(max(Ng,Nh)), Mu0d, &
   & PPm(max(Ng,Nh),Ml*2), Phat0(1,0:max(Ng,Nh))
   logical:: Thermalm
@@ -553,7 +493,8 @@ subroutine Hshm(Nlyr, Od0, Ssa0, Pf, I0, Mu0, T, Tsurf, GS, &
     Pfd(0:Mg,1:Nlyr) = Pf(0:Mg,1:Nlyr)
   endif
 
-  ! in principle, this should be done in Gdrtes, here is for consistency and efficiency
+  ! in principle, this should be done in Gdrtes, 
+  ! put it here for consistency and efficiency
   Beam(0) = I0
   do l = 1, Nlyr
     Beam(l) = Beam(l-1) * exp(-Odd(l) / Mu0)
@@ -694,8 +635,6 @@ subroutine Hshm(Nlyr, Od0, Ssa0, Pf, I0, Mu0, T, Tsurf, GS, &
 
     endif
 
-    !print*, 'Gdrtes done for m = ', m, Ncr, Lcr
-
   enddo
 
   if (Ncr < 2) Mcr = Mm
@@ -706,12 +645,8 @@ subroutine Hshm(Nlyr, Od0, Ssa0, Pf, I0, Mu0, T, Tsurf, GS, &
   Nup = Lmup(0)
   Ndn = Lmdn(0)
   Nstr = Nup + Ndn
-  !Fup(0:Nlyr) = real(4*Pi / Clmh(1,0) * matmul( &
-  !& Pllm(0:2*Nup-2:2,1,0), Itild(1:Nup,0:Nlyr,0) ), Kreal)
   Fup(0:Nlyr) = 4*Pi / sqrt(6.0_Kreal) * real(matmul( &
   & PP(2,1:Nup,0), Itild(1:Nup,0:Nlyr,0) ), Kreal)
-  !Fdn(0:Nlyr) = real(4*Pi / Clmh(1,0) * matmul( &
-  !& Pllm(0:2*Ndn-2:2,1,0), Itild(Ndn+1:Nstr,0:Nlyr,0)), Kreal)
   Fdn(0:Nlyr) = 4*Pi / sqrt(6.0_Kreal) * real(matmul( &
   & - PP(2,Ndn+1:Nstr,0), Itild(Ndn+1:Nstr,0:Nlyr,0)), Kreal)
   Act(0:Nlyr) = 4*Pi * matmul(real(ATint(1:Nstr),Kreal), &
@@ -721,10 +656,7 @@ subroutine Hshm(Nlyr, Od0, Ssa0, Pf, I0, Mu0, T, Tsurf, GS, &
   Cpu = Cpu2 - Cpu1
 
   ! Intensities for specified directions
-
-  !print*, 'Mcr = ', Mcr
   call Intangle3(Nlyr, Rad, Mcr)
-
 
 end subroutine Hshm
 
@@ -733,19 +665,11 @@ subroutine Intangle3(Nlay, Rad, Mcr)
   ! use : Phat
   implicit none
 
-  integer(Kint), intent(in):: Nlay, Mcr!, Numu, Nphi
-  !real(Kreal), intent(in):: Itild(Maxl*2,0:Nlay,0:Mm)!, Umu(Numu), Phi(Nphi)
+  integer(Kint), intent(in):: Nlay, Mcr
   real(Kreal), intent(out):: Rad(Numu,Nphi,0:Nlay)
 
-  real(Kreal2):: Im(0:Mcr,0:Nlay) !Cosphi(Nphi,0:Mm)
+  real(Kreal2):: Im(0:Mcr,0:Nlay)
   integer(Kint):: Nu0, Nd0, m, j
-
-  !do m = 0, Mm
-  !  Cosphi(:,m) = cos(m*Phi(:))
-  !  Lmm = max(Lmup(m), Lmdn(m))
-  !  l = m + 2*Lmm - 1
-  !  Legr(:,m:l,m) = Phat(l,m,real(abs(Umu(1:Numu)), Kreal2))
-  !enddo
 
   do j = 1, Numu
     do m = 0, Mcr
@@ -967,13 +891,12 @@ end Function Planckint
 ! ------------------------------------------------------------------- 
 ! Glquad: Gaussian quadrature points X1 and weight W1, over [A,B]
 subroutine Glquad(A, B, X1, W1)
-  !USE : Ainc
   implicit none
   real(Kreal2), intent(in):: A, B
   real(Kreal2), dimension(:), intent(out):: X1, W1
-  real(Kreal2), parameter:: Eps = 3.0e-14_Kreal2  !wangbiao
+  real(Kreal2), parameter:: Eps = 3.0e-14_Kreal2  !modified
   integer(Kint):: i, j, M, N
-  integer(Kint), parameter:: Maxit = 10   !wangbiao
+  integer(Kint), parameter:: Maxit = 10   !modified
   real(Kreal2):: Xl, Xm
   real(Kreal2), dimension((size(X1)+1)/2):: P1, P2, P3, PPP, Z, Z1
   logical, dimension((size(X1)+1)/2):: No
@@ -1047,4 +970,4 @@ function Ainc(First,Incre,N)
 end function Ainc
 
 
-end module Hshmv4
+end module Mod_Hshm

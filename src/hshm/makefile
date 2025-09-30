@@ -16,22 +16,22 @@ BIN_DIR = bin
 MOD_DIR = $(BUILD_DIR)
 
 # Source files - 添加存在性检查
-ROOT_SRC = $(wildcard $(ROOT_DIR)/gdrtesv0.f90)
+ROOT_SRC = $(wildcard $(ROOT_DIR)/gdrtes.f90)
 HSHM_SRC = $(SRC_DIR)/hshm.f90
 EXAMPLE_SRC = $(SRC_DIR)/example.f90
 
 # 检查根目录源文件是否存在
 ifeq ($(ROOT_SRC),)
-$(error gdrtesv0.f90 not found in $(ROOT_DIR))
+$(error gdrtes.f90 not found in $(ROOT_DIR))
 endif
 
 # Object files
-ROOT_OBJ = $(BUILD_DIR)/gdrtesv0.o
+ROOT_OBJ = $(BUILD_DIR)/gdrtes.o
 HSHM_OBJ = $(BUILD_DIR)/hshm.o
 EXAMPLE_OBJ = $(BUILD_DIR)/example.o
 
 # Module files
-ROOT_MOD = $(MOD_DIR)/gdrtesv0.mod
+ROOT_MOD = $(MOD_DIR)/mod_gdrtes.mod
 HSHM_MOD = $(MOD_DIR)/hshmv4.mod
 
 # Executable
@@ -66,7 +66,8 @@ debug: $(TARGET)
 
 # Clean build artifacts
 clean:
-	rm -rf $(BUILD_DIR) $(BIN_DIR)
+#	rm -rf $(BUILD_DIR) $(BIN_DIR)
+	rm -rf $(BUILD_DIR)
 
 # Run the program
 run: $(TARGET)

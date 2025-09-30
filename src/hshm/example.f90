@@ -1,7 +1,7 @@
 program  testHSHM
 
-    use Gdrtesv0, only: Kreal, Kint, Pi
-    use Hshmv4, only: Hshm, Hshminit, Hshminit1, Nm, Ng, Nh, Lup, Ldn, Lmup, Lmdn, &
+    use Mod_Gdrtes, only: Kreal, Kint, Pi
+    use Mod_Hshm, only: Hshm, Hshminit, Hshminit1, Nm, Ng, Nh, Lup, Ldn, Lmup, Lmdn, &
     & Numu, Nphi, Umu, Phi, &
     & Hshmfin, Itild ! Maxm, Maxg, Maxl
     implicit none
